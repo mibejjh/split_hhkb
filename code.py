@@ -1,0 +1,347 @@
+from time import sleep
+import board
+from digitalio import DigitalInOut, Direction, Pull
+import usb_hid
+import busio
+from adafruit_hid.keyboard import Keyboard
+from adafruit_hid.keycode import Keycode
+import supervisor
+
+KEY_MAP = [
+    [
+        Keycode.ESCAPE,
+        Keycode.ONE,
+        Keycode.TWO,
+        Keycode.THREE,
+        Keycode.FOUR,
+        Keycode.FIVE,
+        Keycode.SIX,
+        None,
+        Keycode.SEVEN,
+        Keycode.EIGHT,
+        Keycode.NINE,
+        Keycode.ZERO,
+        Keycode.MINUS,
+        Keycode.EQUALS,
+        Keycode.BACKSLASH,
+        Keycode.GRAVE_ACCENT,
+    ],
+    [
+        Keycode.TAB,
+        Keycode.Q,
+        Keycode.W,
+        Keycode.E,
+        Keycode.R,
+        Keycode.T,
+        None,
+        None,
+        Keycode.Y,
+        Keycode.U,
+        Keycode.I,
+        Keycode.O,
+        Keycode.P,
+        Keycode.LEFT_BRACKET,
+        Keycode.RIGHT_BRACKET,
+        Keycode.BACKSPACE,
+    ],
+    [
+        Keycode.CONTROL,
+        Keycode.A,
+        Keycode.S,
+        Keycode.D,
+        Keycode.F,
+        Keycode.G,
+        None,
+        None,
+        Keycode.H,
+        Keycode.J,
+        Keycode.K,
+        Keycode.L,
+        Keycode.SEMICOLON,
+        Keycode.QUOTE,
+        None,
+        Keycode.ENTER,
+    ],
+    [
+        Keycode.LEFT_SHIFT,
+        Keycode.Z,
+        Keycode.X,
+        Keycode.C,
+        Keycode.V,
+        Keycode.B,
+        None,
+        None,
+        Keycode.B,
+        Keycode.N,
+        Keycode.M,
+        Keycode.COMMA,
+        Keycode.PERIOD,
+        Keycode.QUOTE,
+        Keycode.RIGHT_SHIFT,
+        Keycode.F24,
+    ],
+    [
+        None,
+        Keycode.WINDOWS,
+        Keycode.LEFT_ALT,
+        None,
+        Keycode.SPACEBAR,
+        None,
+        None,
+        None,
+        Keycode.SPACEBAR,
+        None,
+        Keycode.RIGHT_ALT,
+        Keycode.WINDOWS,
+        None,
+        None,
+        None,
+        None,
+    ],
+]
+
+FN_KEY_MAP = [
+    [
+        Keycode.POUND,  # Keycode.ESCAPE,
+        Keycode.F1,  #        Keycode.ONE,
+        Keycode.F2,  #        Keycode.TWO,
+        Keycode.F3,  #        Keycode.THREE,
+        Keycode.F4,  #        Keycode.FOUR,
+        Keycode.F5,  #        Keycode.FIVE,
+        Keycode.F6,  #        Keycode.SIX,
+        None,  #        None,
+        Keycode.F7,  #        Keycode.SEVEN,
+        Keycode.F8,  #        Keycode.EIGHT,
+        Keycode.F9,  #        Keycode.NINE,
+        Keycode.F10,  #        Keycode.ZERO,
+        Keycode.F11,  #        Keycode.MINUS,
+        Keycode.F12,  #        Keycode.EQUALS,
+        Keycode.INSERT,  #        Keycode.BACKSLASH,
+        Keycode.DELETE,  #        Keycode.GRAVE_ACCENT,
+    ],
+    [
+        Keycode.CAPS_LOCK,  #         Keycode.TAB,
+        None,  #         Keycode.Q,
+        None,  #         Keycode.W,
+        None,  #         Keycode.E,
+        None,  #         Keycode.R,
+        None,  #         Keycode.T,
+        None,  #         None,
+        None,  #         None,
+        None,  #         Keycode.Y,
+        None,  #         Keycode.U,
+        Keycode.PRINT_SCREEN,  #         Keycode.I,
+        Keycode.SCROLL_LOCK,  #         Keycode.O,
+        Keycode.PAUSE,  #         Keycode.P,
+        Keycode.UP_ARROW,  #         Keycode.LEFT_BRACKET,
+        None,  #         Keycode.RIGHT_BRACKET,
+        Keycode.BACKSPACE,  #         Keycode.DELETE,
+    ],
+    [
+        None,  #  Keycode.CONTROL,
+        None,  #         Keycode.A,
+        None,  #         Keycode.S,
+        None,  #         Keycode.D,
+        None,  #         Keycode.F,
+        None,  #         Keycode.G,
+        None,  #         None,
+        None,  #         None,
+        None,  #         Keycode.H,
+        None,  #         Keycode.J,
+        Keycode.HOME,  #         Keycode.K,
+        Keycode.PAGE_UP,  #         Keycode.L,
+        Keycode.LEFT_ARROW,  #         Keycode.SEMICOLON,
+        Keycode.RIGHT_ARROW,  #         Keycode.QUOTE,
+        None,  #         None,
+        Keycode.ENTER,  #         Keycode.ENTER,
+    ],
+    [
+        None,  # Keycode.LEFT_SHIFT,
+        None,  #         Keycode.Z,
+        None,  #         Keycode.X,
+        None,  #         Keycode.C,
+        None,  #         Keycode.V,
+        None,  #         Keycode.B,
+        None,  #         None,
+        None,  #         None,
+        None,  #         Keycode.B,
+        None,  #         Keycode.N,
+        None,  #         Keycode.M,
+        Keycode.END,  #         Keycode.COMMA,
+        Keycode.PAGE_DOWN,  #         Keycode.PERIOD,
+        None,  #         Keycode.QUOTE,
+        None,  #         Keycode.RIGHT_SHIFT,
+        None,  #         Keycode.F24,
+    ],
+    [
+        None,  # None,
+        None,  #         Keycode.WINDOWS,
+        None,  #         Keycode.LEFT_ALT,
+        None,  #         None,
+        None,  #         Keycode.SPACEBAR,
+        None,  #         None,
+        None,  #         None,
+        None,  #         None,
+        None,  #         Keycode.SPACEBAR,
+        None,  #         None,
+        None,  #         Keycode.RIGHT_ALT,
+        None,  #         Keycode.WINDOWS,
+        None,  #         None,
+        None,  #         None,
+        None,  #         None,
+        None,  #         None,
+    ],
+]
+
+
+class BaseKeyboard:
+    def __init__(self) -> None:
+        self.uart = busio.UART(board.GP0, board.GP1, baudrate=115200)
+        self.total_key_state = 0
+        self.read_pins = [
+            DigitalInOut(pin)
+            for pin in [
+                board.GP14,
+                board.GP15,
+                board.GP16,
+                board.GP17,
+                board.GP18,
+                board.GP19,
+                board.GP20,
+                board.GP21,
+            ]
+        ]
+        self.select_pins = [
+            DigitalInOut(pin)
+            for pin in [board.GP9, board.GP10, board.GP11, board.GP12, board.GP13]
+        ]
+        for pin in self.read_pins:
+            pin.direction = Direction.INPUT
+            pin.pull = Pull.DOWN
+
+        for pin in self.select_pins:
+            pin.direction = Direction.OUTPUT
+            pin.value = False
+
+        self.led_pin = DigitalInOut(board.LED)
+        self.led_pin.direction = Direction.OUTPUT
+        self.led_pin.value = True
+
+    def led_control(self, value: bool):
+        self.led_pin.value = value
+
+    def led_toggle(self):
+        self.led_pin.value = not self.led_pin.value
+
+    def read_key_state(self):
+        self.total_key_state = 0
+        for selector_idx in range(len(self.select_pins)):
+            self.select_pins[selector_idx - 1].value = False
+            self.select_pins[selector_idx].value = True
+            for key_state in [r.value for r in self.read_pins]:
+                self.total_key_state = (self.total_key_state << 1) | (
+                    1 if key_state else 0
+                )
+
+    def sync_key_state(self) -> bool:
+        return False
+
+    def handle_key_state(self):
+        pass
+
+    def run(self):
+        count = 0
+        while True:
+            if count % 100 == 0:
+                self.led_toggle()
+            self.read_key_state()
+            self.sync_key_state()
+            self.handle_key_state()
+            count += 1
+
+
+class MasterKeyboard(BaseKeyboard):
+    def __init__(self) -> None:
+        super().__init__()
+        self.slave_key_state = 0
+        self.prev_key_state = [[False for _ in range(16)] for _ in range(5)]
+        self.current_key_state = [[False for _ in range(16)] for _ in range(5)]
+        self.keyboard = Keyboard(usb_hid.devices)
+
+    def sync_key_state(self) -> bool:
+        self.uart.write(b"req")
+        recved = self.uart.read(5)
+        self.slave_key_state = int.from_bytes(recved, "little")
+        print(self.slave_key_state)
+
+        for row in range(5)[::-1]:
+            for col in range(16)[::-1]:
+                if col < 8:
+                    self.current_key_state[row][col] = bool(self.slave_key_state & 1)
+                    self.slave_key_state >>= 1
+                else:
+                    self.current_key_state[row][col] = bool(self.total_key_state & 1)
+                    self.total_key_state >>= 1
+
+        return True
+
+    def handle_key_state(self):
+        pressed = dict(normal=[], fn=[])
+        released = dict(normal=[], fn=[])
+        _p = []
+        for row in range(5):
+            for col in range(16):
+                if (
+                    self.prev_key_state[row][col]
+                    and not self.current_key_state[row][col]
+                ):
+                    released["normal"].append(KEY_MAP[row][col])
+                    released["fn"].append(FN_KEY_MAP[row][col])
+                elif (
+                    not self.prev_key_state[row][col]
+                    and self.current_key_state[row][col]
+                ):
+                    pressed["normal"].append(KEY_MAP[row][col])
+                    pressed["fn"].append(FN_KEY_MAP[row][col])
+
+                if self.current_key_state[row][col]:
+                    _p.append(KEY_MAP[row][col])
+        print([hex(p) if p else None for p in _p])
+
+
+
+
+        if Keycode.F24 in pressed["normal"]:
+            self.keyboard.release_all()
+            self.keyboard.press(
+                *[k for k in pressed["fn"] if k not in [Keycode.F24, None]]
+            )
+        elif Keycode.F24 in released["normal"]:
+            self.keyboard.release_all()
+            self.keyboard.press(
+                *[k for k in pressed["fn"] if k not in [Keycode.F24, None]]
+            )
+        # self.keyboard.release(*released)
+        # self.keyboard.send(*pressed)
+
+
+class SlaveKeyboard(BaseKeyboard):
+    def __init__(self) -> None:
+        super().__init__()
+        self.count = 0
+
+    def sync_key_state(self) -> bool:
+        if self.uart.read(3) != b"req":
+            return False
+
+        self.total_key_state |= 1 << self.count % 40
+        self.count += 1
+        self.uart.write(self.total_key_state.to_bytes(5, "little"))
+        return True
+
+
+sleep(1)
+is_master = supervisor.runtime.usb_connected
+keyboard = MasterKeyboard() if is_master else SlaveKeyboard()
+
+keyboard.run()
