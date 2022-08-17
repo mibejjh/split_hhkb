@@ -243,7 +243,18 @@ class BaseMouse:
             clicked |= Mouse.MIDDLE_BUTTON
 
         if clicked > 0:
-            self.mouse.click(clicked)
+            self.mouse.press(clicked)
+
+        unclicked = 0
+        if "Mouse Left Click" in released:
+            unclicked = unclicked | Mouse.LEFT_BUTTON
+        if "Mouse Right Click" in released:
+            unclicked |= Mouse.RIGHT_BUTTON
+        if "Mouse Middle Click" in released:
+            unclicked |= Mouse.MIDDLE_BUTTON
+        if unclicked > 0:
+            self.mouse.release(unclicked)
+
 
     def on_mouse_move(self, states):
         if "Mouse Up" in states:
