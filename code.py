@@ -9,6 +9,20 @@ from adafruit_hid.keycode import Keycode
 from adafruit_hid.mouse import Mouse
 import supervisor
 
+EXCLUDED_KEYS = {
+    None,
+    Keycode.F24,
+    "Mouse Up",
+    "Mouse Left",
+    "Mouse Down",
+    "Mouse Right",
+    "Mouse Wheel Up",
+    "Mouse Wheel Down",
+    "Mouse Right Click",
+    "Mouse Left Click",
+    "Mouse Middle Click",
+}
+
 KEY_MAP = [
     [
         Keycode.ESCAPE,
@@ -200,6 +214,7 @@ class BaseMouse:
         self.mouse = Mouse(usb_hid.devices)
         self.prev_mouse_state = set()
         self.dx = self.dy = self.dwheel = 0
+        self.acc = 3.0
 
     def on_mouse_state(self, *states):
         current_states = set(states)
@@ -243,6 +258,13 @@ class BaseMouse:
             self.dx = 1
         else:
             self.dx = 0
+
+        if self.dx == 0 and self.dy == 0:
+            self.acc = 3.0
+        else:
+            self.acc += 0.2
+            self.acc = min(10, self.acc)
+
         if "Mouse Wheel Up" in states:
             self.dwheel = 1
         elif "Mouse Wheel Down" in states:
@@ -250,7 +272,9 @@ class BaseMouse:
         else:
             self.dwheel = 0
         if self.dx != 0 or self.dy != 0 or self.dwheel != 0:
-            self.mouse.move(self.dx, self.dy, self.dwheel)
+            self.mouse.move(
+                int(self.dx * self.acc), int(self.dy * self.acc), self.dwheel
+            )
 
 
 class BaseKeyboard:
@@ -393,46 +417,8 @@ class MasterKeyboard(BaseKeyboard):
         pressed = current_pressing_keys - self.prev_pressing_key
         released = self.prev_pressing_key - current_pressing_keys
 
-        self.keyboard.press(
-            *[
-                k
-                for k in pressed
-                if k
-                not in [
-                    None,
-                    Keycode.F24,
-                    "Mouse Up",
-                    "Mouse Left",
-                    "Mouse Down",
-                    "Mouse Right",
-                    "Mouse Wheel Up",
-                    "Mouse Wheel Down",
-                    "Mouse Right Click",
-                    "Mouse Left Click",
-                    "Mouse Middle Click",
-                ]
-            ]
-        )
-        self.keyboard.release(
-            *[
-                k
-                for k in released
-                if k
-                not in [
-                    None,
-                    Keycode.F24,
-                    "Mouse Up",
-                    "Mouse Left",
-                    "Mouse Down",
-                    "Mouse Right",
-                    "Mouse Wheel Up",
-                    "Mouse Wheel Down",
-                    "Mouse Right Click",
-                    "Mouse Left Click",
-                    "Mouse Middle Click",
-                ]
-            ]
-        )
+        self.keyboard.press(*[k for k in pressed if k not in EXCLUDED_KEYS])
+        self.keyboard.release(*[k for k in released if k not in EXCLUDED_KEYS])
 
         self.mouse.on_mouse_state(
             *(s for s in current_pressing_keys if isinstance(s, str))
