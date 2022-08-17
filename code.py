@@ -1,3 +1,4 @@
+import os
 from time import sleep
 import board
 from digitalio import DigitalInOut, Direction, Pull
@@ -76,7 +77,7 @@ KEY_MAP = [
         Keycode.M,
         Keycode.COMMA,
         Keycode.PERIOD,
-        Keycode.QUOTE,
+        Keycode.FORWARD_SLASH,
         Keycode.RIGHT_SHIFT,
         Keycode.F24,
     ],
@@ -99,9 +100,9 @@ KEY_MAP = [
         None,
     ],
 ]
-
 FN_KEY_MAP = [
     [
+
         Keycode.POUND,  # Keycode.ESCAPE,
         Keycode.F1,  #        Keycode.ONE,
         Keycode.F2,  #        Keycode.TWO,
@@ -169,7 +170,7 @@ FN_KEY_MAP = [
         None,  #         Keycode.M,
         Keycode.END,  #         Keycode.COMMA,
         Keycode.PAGE_DOWN,  #         Keycode.PERIOD,
-        None,  #         Keycode.QUOTE,
+        Keycode.DOWN_ARROW,  #         Keycode.FORWARD_SLASH
         None,  #         Keycode.RIGHT_SHIFT,
         None,  #         Keycode.F24,
     ],
@@ -201,19 +202,25 @@ class BaseKeyboard:
         self.read_pins = [
             DigitalInOut(pin)
             for pin in [
+                board.GP11,
+                board.GP12,
+                board.GP13,
                 board.GP14,
                 board.GP15,
+            ]
+        ]
+        self.select_pins = [
+            DigitalInOut(pin)
+            for pin in [
                 board.GP16,
                 board.GP17,
                 board.GP18,
                 board.GP19,
                 board.GP20,
                 board.GP21,
+                board.GP22,
+                board.GP26,
             ]
-        ]
-        self.select_pins = [
-            DigitalInOut(pin)
-            for pin in [board.GP9, board.GP10, board.GP11, board.GP12, board.GP13]
         ]
         for pin in self.read_pins:
             pin.direction = Direction.INPUT
@@ -267,27 +274,46 @@ class MasterKeyboard(BaseKeyboard):
         self.prev_key_state = [[False for _ in range(16)] for _ in range(5)]
         self.current_key_state = [[False for _ in range(16)] for _ in range(5)]
         self.keyboard = Keyboard(usb_hid.devices)
+        self.is_fn_pressed = False
+        self.is_right = "right" in os.listdir()
+        print(f"{self.is_right=}")
 
     def sync_key_state(self) -> bool:
         self.uart.write(b"req")
         recved = self.uart.read(5)
         self.slave_key_state = int.from_bytes(recved, "little")
-        print(self.slave_key_state)
+        # print(self.slave_key_state)
 
-        for row in range(5)[::-1]:
-            for col in range(16)[::-1]:
-                if col < 8:
-                    self.current_key_state[row][col] = bool(self.slave_key_state & 1)
-                    self.slave_key_state >>= 1
+        for col in range(16)[::-1]:
+            for row in range(5)[::-1]:
+                if self.is_right:
+                    if col < 8:
+                        self.current_key_state[row][col] = bool(
+                            self.slave_key_state & 1
+                        )
+                        self.slave_key_state >>= 1
+                    else:
+                        self.current_key_state[row][col] = bool(
+                            self.total_key_state & 1
+                        )
+                        self.total_key_state >>= 1
                 else:
-                    self.current_key_state[row][col] = bool(self.total_key_state & 1)
-                    self.total_key_state >>= 1
-
+                    if col < 8:
+                        self.current_key_state[row][col] = bool(
+                            self.total_key_state & 1
+                        )
+                        self.total_key_state >>= 1
+                    else:
+                        self.current_key_state[row][col] = bool(
+                            self.slave_key_state & 1
+                        )
+                        self.slave_key_state >>= 1
         return True
 
     def handle_key_state(self):
         pressed = dict(normal=[], fn=[])
         released = dict(normal=[], fn=[])
+
         _p = []
         for row in range(5):
             for col in range(16):
@@ -306,25 +332,38 @@ class MasterKeyboard(BaseKeyboard):
 
                 if self.current_key_state[row][col]:
                     _p.append(KEY_MAP[row][col])
-        print([hex(p) if p else None for p in _p])
 
-
-
-
+        # print([hex(p) if p else None for p in _p])
+        if released["normal"]:
+            print(f"{released=}");
+        if pressed["normal"]:
+            print(f"{pressed=}");
+        
+        for row in range(5):
+            for col in range(16):
+                self.prev_key_state[row][col] = self.current_key_state[row][col]
+        
         if Keycode.F24 in pressed["normal"]:
             self.keyboard.release_all()
-            self.keyboard.press(
-                *[k for k in pressed["fn"] if k not in [Keycode.F24, None]]
-            )
+            self.is_fn_pressed = True
         elif Keycode.F24 in released["normal"]:
             self.keyboard.release_all()
-            self.keyboard.press(
-                *[k for k in pressed["fn"] if k not in [Keycode.F24, None]]
-            )
-        # self.keyboard.release(*released)
-        # self.keyboard.send(*pressed)
-
-
+            self.is_fn_pressed = False
+        self.keyboard.release(
+            *[
+                k
+                for k in released["fn" if self.is_fn_pressed else "normal"]
+                if k not in [Keycode.F24, None]
+            ]
+        )
+        self.keyboard.press(
+            *[
+                k
+                for k in pressed["fn" if self.is_fn_pressed else "normal"]
+                if k not in [Keycode.F24, None]
+            ]
+        )
+      
 class SlaveKeyboard(BaseKeyboard):
     def __init__(self) -> None:
         super().__init__()
@@ -334,7 +373,7 @@ class SlaveKeyboard(BaseKeyboard):
         if self.uart.read(3) != b"req":
             return False
 
-        self.total_key_state |= 1 << self.count % 40
+        # self.total_key_state |= 1 << self.count % 40
         self.count += 1
         self.uart.write(self.total_key_state.to_bytes(5, "little"))
         return True
