@@ -102,7 +102,6 @@ KEY_MAP = [
 ]
 FN_KEY_MAP = [
     [
-
         Keycode.POUND,  # Keycode.ESCAPE,
         Keycode.F1,  #        Keycode.ONE,
         Keycode.F2,  #        Keycode.TWO,
@@ -122,33 +121,33 @@ FN_KEY_MAP = [
     ],
     [
         Keycode.CAPS_LOCK,  #         Keycode.TAB,
-        None,  #         Keycode.Q,
-        None,  #         Keycode.W,
-        None,  #         Keycode.E,
-        None,  #         Keycode.R,
-        None,  #         Keycode.T,
+        Keycode.Q,
+        Keycode.W,
+        Keycode.E,
+        Keycode.R,
+        Keycode.T,
         None,  #         None,
         None,  #         None,
-        None,  #         Keycode.Y,
-        None,  #         Keycode.U,
+        Keycode.Y,
+        Keycode.U,
         Keycode.PRINT_SCREEN,  #         Keycode.I,
         Keycode.SCROLL_LOCK,  #         Keycode.O,
         Keycode.PAUSE,  #         Keycode.P,
         Keycode.UP_ARROW,  #         Keycode.LEFT_BRACKET,
-        None,  #         Keycode.RIGHT_BRACKET,
+        Keycode.RIGHT_BRACKET,
         Keycode.BACKSPACE,  #         Keycode.DELETE,
     ],
     [
-        None,  #  Keycode.CONTROL,
-        None,  #         Keycode.A,
-        None,  #         Keycode.S,
-        None,  #         Keycode.D,
-        None,  #         Keycode.F,
-        None,  #         Keycode.G,
-        None,  #         None,
-        None,  #         None,
-        None,  #         Keycode.H,
-        None,  #         Keycode.J,
+        Keycode.CONTROL,
+        Keycode.A,
+        Keycode.S,
+        Keycode.D,
+        Keycode.F,
+        Keycode.G,
+        None,
+        None,
+        Keycode.H,
+        Keycode.J,
         Keycode.HOME,  #         Keycode.K,
         Keycode.PAGE_UP,  #         Keycode.L,
         Keycode.LEFT_ARROW,  #         Keycode.SEMICOLON,
@@ -157,40 +156,40 @@ FN_KEY_MAP = [
         Keycode.ENTER,  #         Keycode.ENTER,
     ],
     [
-        None,  # Keycode.LEFT_SHIFT,
-        None,  #         Keycode.Z,
-        None,  #         Keycode.X,
-        None,  #         Keycode.C,
-        None,  #         Keycode.V,
-        None,  #         Keycode.B,
-        None,  #         None,
-        None,  #         None,
-        None,  #         Keycode.B,
-        None,  #         Keycode.N,
-        None,  #         Keycode.M,
+        Keycode.LEFT_SHIFT,
+        Keycode.Z,
+        Keycode.X,
+        Keycode.C,
+        Keycode.V,
+        Keycode.B,
+        None,
+        None,
+        Keycode.B,
+        Keycode.N,
+        Keycode.M,
         Keycode.END,  #         Keycode.COMMA,
         Keycode.PAGE_DOWN,  #         Keycode.PERIOD,
         Keycode.DOWN_ARROW,  #         Keycode.FORWARD_SLASH
-        None,  #         Keycode.RIGHT_SHIFT,
-        None,  #         Keycode.F24,
+        Keycode.RIGHT_SHIFT,
+        Keycode.F24,
     ],
     [
-        None,  # None,
-        None,  #         Keycode.WINDOWS,
-        None,  #         Keycode.LEFT_ALT,
-        None,  #         None,
-        None,  #         Keycode.SPACEBAR,
-        None,  #         None,
-        None,  #         None,
-        None,  #         None,
-        None,  #         Keycode.SPACEBAR,
-        None,  #         None,
-        None,  #         Keycode.RIGHT_ALT,
-        None,  #         Keycode.WINDOWS,
-        None,  #         None,
-        None,  #         None,
-        None,  #         None,
-        None,  #         None,
+        None,
+        Keycode.WINDOWS,
+        Keycode.LEFT_ALT,
+        None,
+        Keycode.SPACEBAR,
+        None,
+        None,
+        None,
+        Keycode.SPACEBAR,
+        None,
+        Keycode.RIGHT_ALT,
+        Keycode.WINDOWS,
+        None,
+        None,
+        None,
+        None,
     ],
 ]
 
@@ -273,6 +272,9 @@ class MasterKeyboard(BaseKeyboard):
         self.slave_key_state = 0
         self.prev_key_state = [[False for _ in range(16)] for _ in range(5)]
         self.current_key_state = [[False for _ in range(16)] for _ in range(5)]
+
+        self.prev_pressing_key = set()
+
         self.keyboard = Keyboard(usb_hid.devices)
         self.is_fn_pressed = False
         self.is_right = "right" in os.listdir()
@@ -311,59 +313,34 @@ class MasterKeyboard(BaseKeyboard):
         return True
 
     def handle_key_state(self):
-        pressed = dict(normal=[], fn=[])
-        released = dict(normal=[], fn=[])
-
         _p = []
+        current_pressing_keys = set()
+        self.is_fn_pressed = self.current_key_state[3][15]
+
         for row in range(5):
             for col in range(16):
-                if (
-                    self.prev_key_state[row][col]
-                    and not self.current_key_state[row][col]
-                ):
-                    released["normal"].append(KEY_MAP[row][col])
-                    released["fn"].append(FN_KEY_MAP[row][col])
-                elif (
-                    not self.prev_key_state[row][col]
-                    and self.current_key_state[row][col]
-                ):
-                    pressed["normal"].append(KEY_MAP[row][col])
-                    pressed["fn"].append(FN_KEY_MAP[row][col])
+                if self.current_key_state[row][col]:
+                    current_pressing_keys.add(
+                        FN_KEY_MAP[row][col]
+                        if self.is_fn_pressed
+                        else KEY_MAP[row][col]
+                    )
 
                 if self.current_key_state[row][col]:
                     _p.append(KEY_MAP[row][col])
 
-        # print([hex(p) if p else None for p in _p])
-        if released["normal"]:
-            print(f"{released=}");
-        if pressed["normal"]:
-            print(f"{pressed=}");
-        
-        for row in range(5):
-            for col in range(16):
-                self.prev_key_state[row][col] = self.current_key_state[row][col]
-        
-        if Keycode.F24 in pressed["normal"]:
-            self.keyboard.release_all()
-            self.is_fn_pressed = True
-        elif Keycode.F24 in released["normal"]:
-            self.keyboard.release_all()
-            self.is_fn_pressed = False
-        self.keyboard.release(
-            *[
-                k
-                for k in released["fn" if self.is_fn_pressed else "normal"]
-                if k not in [Keycode.F24, None]
-            ]
-        )
-        self.keyboard.press(
-            *[
-                k
-                for k in pressed["fn" if self.is_fn_pressed else "normal"]
-                if k not in [Keycode.F24, None]
-            ]
-        )
-      
+
+        pressed = current_pressing_keys - self.prev_pressing_key
+        released = self.prev_pressing_key - current_pressing_keys
+
+
+        self.keyboard.press(*[ k for k in pressed if k not in [None, Keycode.F24]])
+        self.keyboard.release(*[k for k in released if k not in [None, Keycode.F24]])
+
+        self.prev_pressing_key = current_pressing_keys
+
+
+
 class SlaveKeyboard(BaseKeyboard):
     def __init__(self) -> None:
         super().__init__()
