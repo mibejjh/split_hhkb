@@ -273,8 +273,8 @@ class BaseMouse:
         if self.dx == 0 and self.dy == 0:
             self.acc = 3.0
         else:
-            self.acc += 0.2
-            self.acc = min(10, self.acc)
+            self.acc += 0.5
+            self.acc = min(20, self.acc)
 
         if "Mouse Wheel Up" in states:
             self.dwheel = 1
@@ -427,14 +427,14 @@ class MasterKeyboard(BaseKeyboard):
 
         pressed = current_pressing_keys - self.prev_pressing_key
         released = self.prev_pressing_key - current_pressing_keys
-
+        if Keycode.F24 in released:
+            sleep(0.3)
         self.keyboard.press(*[k for k in pressed if k not in EXCLUDED_KEYS])
         self.keyboard.release(*[k for k in released if k not in EXCLUDED_KEYS])
 
         self.mouse.on_mouse_state(
             *(s for s in current_pressing_keys if isinstance(s, str))
         )
-
         self.prev_pressing_key = current_pressing_keys
 
 
