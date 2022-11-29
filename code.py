@@ -374,6 +374,9 @@ class MasterKeyboard(BaseKeyboard):
 
         self.is_fn_pressed = False
         self.is_right = "right" in os.listdir()
+        
+        self.fn_count = 0
+        
         print(f"{self.is_right=}")
 
     def sync_key_state(self) -> bool:
@@ -411,7 +414,24 @@ class MasterKeyboard(BaseKeyboard):
     def handle_key_state(self):
         _p = []
         current_pressing_keys = set()
-        self.is_fn_pressed = self.current_key_state[3][15]
+        
+        fn_state = self.current_key_state[3][15]
+
+        if self.is_fn_pressed:
+            print(self.fn_count)
+            if not fn_state:
+                self.fn_count += 1
+            else:
+                self.fn_count = 0
+            if self.fn_count >= 15:
+                self.is_fn_pressed = False
+                print("fn released")
+        else:
+            if fn_state:
+                self.is_fn_pressed = True
+                self.fn_count = 0
+            
+            
 
         for row in range(5):
             for col in range(16):
@@ -427,8 +447,7 @@ class MasterKeyboard(BaseKeyboard):
 
         pressed = current_pressing_keys - self.prev_pressing_key
         released = self.prev_pressing_key - current_pressing_keys
-        if Keycode.F24 in released:
-            sleep(0.3)
+        
         self.keyboard.press(*[k for k in pressed if k not in EXCLUDED_KEYS])
         self.keyboard.release(*[k for k in released if k not in EXCLUDED_KEYS])
 
@@ -436,7 +455,6 @@ class MasterKeyboard(BaseKeyboard):
             *(s for s in current_pressing_keys if isinstance(s, str))
         )
         self.prev_pressing_key = current_pressing_keys
-
 
 class SlaveKeyboard(BaseKeyboard):
     def __init__(self) -> None:
